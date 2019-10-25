@@ -1,0 +1,208 @@
+---
+title: "#TidyTuesday - Week 43"
+subtitle: "Horroe Movies"
+author: '[Evan W Barba](https://github.com/ewbarba)'
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    lightbox: TRUE
+    gallery: TRUE
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc_depth: '1'
+---
+
+```{r}
+#define packages desired
+dependencies <- c("tidyverse", "plotly", "ggmap", "quantmod", "countrycode", "mgcv", "broom")
+
+#check if pacakges are installed - load if so, install+load if not)
+for (i in dependencies) {
+  if (i %in% row.names(installed.packages())){
+    eval(bquote(library(.(i))))
+    message(paste("loaded package",i))
+    }  else {
+    install.packages(i)
+    eval(bquote(library(.(i))))
+  }
+}
+
+#This week's data is from the IMDB by way of Kaggle
+horror_movies <-
+  readr::read_csv(
+    "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-10-22/horror_movies.csv"
+  )
+
+#register google api for lat long of filming locations
+register_google(key="<your key here (free @ https://developers.google.com/maps/documentation/maps-static/get-api-key)>", write=T)
+```
+
+Use google's api to gather lat and long of filming locations
+```{r, message=FALSE}
+locations <- horror_movies %>% filter(!is.na(filming_locations)) %>% mutate_geocode(.,filming_locations)
+```
+
+Data wringlin'
+```{r}
+horror_movies$currency <- gsub("[0-9,[:space:]]", "", horror_movies$budget) #strip currency
+horror_movies$currency <- gsub("\\$", "USD", horror_movies$currency) #convert symbols to currency abbrvs
+horror_movies$currency <- gsub("\\£", "GBP", horror_movies$currency)
+horror_movies$currency <- gsub("\\€", "EUR", horror_movies$currency)
+horror_movies$currency <- gsub("RUR", "RUB", horror_movies$currency) #1 RUB == 1000 RUR (Old Russian Ruble obsolete ca. 1998 - from coinmill.com) - change to get updated currency value
+horror_movies$currency <- gsub("TRL", "TRY", horror_movies$currency) #1 TRY == 1000000 TRL (Old Turkis Lire obsolete ca. 2005 - from coinmill.com) - change to get updated currency value
+horror_movies$currency <- str_remove_all(horror_movies$currency, "\\s") #compulsively remove the spaces
+currencies <- unique(horror_movies$currency)[-1]#store uniq currency for conversions
+horror_movies$run.time.num <- as.numeric(gsub(" min","", horror_movies$movie_run_time))
+
+#weed out the unrecognized currencies 
+# for(i in currencies){
+#   getQuote(paste0(i,"USD","=X"))
+#   print(i)
+# }
+
+xchange.current <- getQuote(paste0(currencies, rep("USD", length(currencies)),"=X")) #get current exchange rate for currencies to USD, can replace USD with desired currency
+horror_movies$value.in.usd <- as.numeric(gsub("[^0-9]", "", horror_movies$budget))
+
+#convert budgets to usd
+for(i in 1:nrow(horror_movies)){
+  if(!is.na(horror_movies$value.in.usd[i])){
+    horror_movies$value.in.usd[i] <- horror_movies$value.in.usd[i]*xchange.current$Last[which(grepl(horror_movies$currency[i], substr(row.names(xchange.current),1,3)))]
+  }
+}
+
+#adjust RUR to RUB
+for(i in which(horror_movies$currency=="RUB")){
+  horror_movies$value.in.usd[i] <- horror_movies$value.in.usd[i]/1000
+}
+
+#Adjust TRL to TRY
+for(i in which(horror_movies$currency=="TRY")){
+  horror_movies$value.in.usd[i] <- horror_movies$value.in.usd[i]/1000000
+}
+
+#Add region and continent information
+horror_movies$region <- countrycode(sourcevar = horror_movies$release_country, origin = "country.name", destination = "region")
+horror_movies$continent <- countrycode(sourcevar = horror_movies$release_country, origin = "country.name", destination = "continent")
+```
+
+
+```{r}
+#generate figure
+plot_ly(horror_movies,
+        y=~review_rating,
+        x=~log(value.in.usd),
+        color=~continent,
+        size = ~run.time.num,
+        text = ~paste0('<b>',title,'</b>', '<br>','<br>',  
+                      'Review rating: ', review_rating, '<br>',
+                      'log(Budget) (in $USD): $', value.in.usd, '<br>',
+                      'Run-time: ', movie_run_time, '<br>',
+                      'Language: ', language,'<br>',
+                      'Release Country: ', release_country)) %>%
+  add_annotations(text = "Conintent Released",
+                     xref = "paper",
+                     yref = "paper",
+                     x = 1.01, 
+                     xanchor = "left",
+                     y = .67,
+                     yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE) %>%
+  
+  layout(title="Log Transformed Budgets vs Reviews",
+         yaxis = list(title = 'Review Rating'),
+         xaxis = list(title = 'log(Budget) in $USD', position =0),
+         legend = list(x=100,y=.5, text='title'),
+          images = list(
+          source = "https://media.istockphoto.com/photos/fog-background-picture-id845785528?k=6&m=845785528&s=612x612&w=0&h=VRNazaue6d8xtOBMnV01OV1bpsmo_TfsDVi84gXx278=",
+           xref = "x",
+           yref = "y",
+           x= -10,
+           y= 10,
+           sizex = 40,
+           sizey = 10,
+           sizing = 'stretch',
+           opacity = 0.4,
+           
+           layer='below'
+        )
+      )
+    
+
+```
+
+>This figure shows the relationship between budget (log scale, converted to USD) and rating. Each maker is sized by runtime and colored by continental origin.
+
+```{r}
+locations$region <- countrycode(sourcevar = locations$release_country, origin = "country.name", destination = "region")
+locations$continent <- countrycode(sourcevar = locations$release_country, origin = "country.name", destination = "continent")
+
+
+g <- list(
+  showland = TRUE,
+  showlakes = TRUE,
+  showcountries = TRUE,
+  showocean = TRUE,
+  countrywidth = 0.5,
+  x=1,y=1,
+  landcolor = toRGB("grey50"),
+  lakecolor = toRGB("grey90"),
+  oceancolor = toRGB("grey24"),
+  projection = list(
+    type = 'orthographic',
+    rotation = list(
+      lon = -100,
+      lat = 40,
+      roll = 0
+    )
+  ))
+
+plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
+         text = ~paste0('<b>',title,'</b>', '<br>','<br>',
+                      'Filimg Location: ', filming_locations, '<br>',
+                      'Review rating: ', review_rating, '<br>',
+                      'Run-time: ', movie_run_time, '<br>',
+                      'Language: ', language,'<br>',
+                      'Release Country: ', release_country)) %>%
+   add_annotations(text = "Conintent Released",
+                     xref = "paper",
+                     yref = "paper",
+                     x = 1.01, 
+                     xanchor = "left",
+                     y = .67,
+                     yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE) %>%
+  add_markers(
+    x = ~lon,
+    y = ~lat, 
+    size = ~review_rating,
+    color = ~continent) %>%
+  layout(title = 'The World\'s Spookiest Places (if filming locations are an indicator)', geo = g,
+         legend = list(x=100,y=.5))
+         
+
+
+
+```
+
+>This plot displays all filming locations from the provided dataset. Each marker is sized by movie rating and colored by continent of release
+
+#####Bonus I have not gotten to yet
+
+#Using historical exchange rate data from https://fred.stlouisfed.org, gathered by Datopian (https://datahub.io/core)...not today
+```{r}
+xchangerate <- read_csv("https://pkgstore.datahub.io/core/exchange-rates/daily_csv/data/03e15e28c7eea87026fee299a8859e97/daily_csv.csv")
+```
+
+
+Determine number of listed cast
+```{r}
+horror_movies$num.listed.cast <- NA
+for(i in 1:nrow(horror_movies)){
+  horror_movies$num.listed.cast[i] <- length(str_split(horror_movies$cast[i], "\\|")[[1]])
+  } 
+
+```
