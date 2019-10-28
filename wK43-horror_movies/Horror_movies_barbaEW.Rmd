@@ -1,6 +1,6 @@
 ---
 title: "#TidyTuesday - Week 43"
-subtitle: "Horroe Movies"
+subtitle: "Horror Movies"
 author: '[Evan W Barba](https://github.com/ewbarba)'
 date: "`r Sys.Date()`"
 output:
@@ -36,7 +36,7 @@ horror_movies <-
   )
 
 #register google api for lat long of filming locations
-register_google(key="<your key here (free @ https://developers.google.com/maps/documentation/maps-static/get-api-key)>", write=T)
+#register_google(key="<your key here (free @ https://developers.google.com/maps/documentation/maps-static/get-api-key)>", write=T)
 ```
 
 Use google's api to gather lat and long of filming locations
@@ -54,16 +54,20 @@ horror_movies$currency <- gsub("RUR", "RUB", horror_movies$currency) #1 RUB == 1
 horror_movies$currency <- gsub("TRL", "TRY", horror_movies$currency) #1 TRY == 1000000 TRL (Old Turkis Lire obsolete ca. 2005 - from coinmill.com) - change to get updated currency value
 horror_movies$currency <- str_remove_all(horror_movies$currency, "\\s") #compulsively remove the spaces
 currencies <- unique(horror_movies$currency)[-1]#store uniq currency for conversions
-horror_movies$run.time.num <- as.numeric(gsub(" min","", horror_movies$movie_run_time))
+horror_movies$run.time.num <- as.numeric(gsub(" min","", horror_movies$movie_run_time)) #get numeric value of runtimes
+horror_movies$release_date <- as.Date(horror_movies$release_date, "%d-%b-%y") #release date formatting to Date class
 
 #weed out the unrecognized currencies 
-# for(i in currencies){
-#   getQuote(paste0(i,"USD","=X"))
-#   print(i)
-# }
+ for(i in currencies){
+   tryCatch({
+     getQuote(paste0(i,"USD","=X"))
+     print(i)
+   }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+ }
 
-xchange.current <- getQuote(paste0(currencies, rep("USD", length(currencies)),"=X")) #get current exchange rate for currencies to USD, can replace USD with desired currency
+xchange.current <- getQuote(paste0(currencies, rep("USD", length(currencies)),"=X")) #get current exchange rate for currencies to USD, can replace USD with desired currency - only works when markets are open - change to getFX?
 horror_movies$value.in.usd <- as.numeric(gsub("[^0-9]", "", horror_movies$budget))
+#tail(getFX("SEK/USD", auto.assign = F),1)
 
 #convert budgets to usd
 for(i in 1:nrow(horror_movies)){
@@ -129,8 +133,6 @@ plot_ly(horror_movies,
            layer='below'
         )
       )
-    
-
 ```
 
 >This figure shows the relationship between budget (log scale, converted to USD) and rating. Each maker is sized by runtime and colored by continental origin.
@@ -189,6 +191,25 @@ plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
 ```
 
 >This plot displays all filming locations from the provided dataset. Each marker is sized by movie rating and colored by continent of release
+
+```{r}
+plot_ly(horror_movies,
+        y=~review_rating,
+        x=~release_date,
+        size =~value.in.usd,
+        color = ~run.time.num,
+        text = ~paste0('<b>',title,'</b>', '<br>','<br>',  
+                      'Review rating: ', review_rating, '<br>',
+                      'log(Budget) (in $USD): $', value.in.usd, '<br>',
+                      'Run-time: ', movie_run_time, '<br>',
+                      'Language: ', language,'<br>',
+                      'Release Country: ', release_country)) %>%
+  add_trace(horror_movies,
+            x=~release_date,
+            y=~run.time.num,
+            mode='line')
+```
+
 
 #####Bonus I have not gotten to yet
 
