@@ -192,23 +192,7 @@ plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
 
 >This plot displays all filming locations from the provided dataset. Each marker is sized by movie rating and colored by continent of release
 
-```{r}
-plot_ly(horror_movies,
-        y=~review_rating,
-        x=~release_date,
-        size =~value.in.usd,
-        color = ~run.time.num,
-        text = ~paste0('<b>',title,'</b>', '<br>','<br>',  
-                      'Review rating: ', review_rating, '<br>',
-                      'log(Budget) (in $USD): $', value.in.usd, '<br>',
-                      'Run-time: ', movie_run_time, '<br>',
-                      'Language: ', language,'<br>',
-                      'Release Country: ', release_country)) %>%
-  add_trace(horror_movies,
-            x=~release_date,
-            y=~run.time.num,
-            mode='line')
-```
+
 
 
 #####Bonus I have not gotten to yet
@@ -226,4 +210,22 @@ for(i in 1:nrow(horror_movies)){
   horror_movies$num.listed.cast[i] <- length(str_split(horror_movies$cast[i], "\\|")[[1]])
   } 
 
+```
+
+```{r}
+plot_ly(horror_movies,
+        y=~review_rating,
+        x=~release_date,
+        size =~value.in.usd,
+        color = ~run.time.num,
+        text = ~paste0('<b>',title,'</b>', '<br>','<br>',  
+                      'Review rating: ', review_rating, '<br>',
+                      'log(Budget) (in $USD): $', value.in.usd, '<br>',
+                      'Run-time: ', movie_run_time, '<br>',
+                      'Language: ', language,'<br>',
+                      'Release Country: ', release_country)) %>%
+  add_trace(horror_movies,
+            x=~release_date,
+            y=~run.time.num,
+            mode='line')
 ```
