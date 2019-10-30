@@ -102,7 +102,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
     ) %>%
   
   animation_opts(
-    100, easing = "elastic", redraw = T
+    1000, easing = "elastic", redraw = T
   ) %>%
   
      add_annotations(text = "Hold Ctrl to change pitch and bearing",
@@ -165,7 +165,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
     ) %>%
   
   animation_opts(
-    100, easing = "elastic", redraw = T
+    1000, easing = "elastic", redraw = T
   ) %>%
   
      add_annotations(text = "Hold Ctrl to change pitch and bearing",
@@ -226,7 +226,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
     ) %>%
   
   animation_opts(
-    100, easing = "elastic", redraw = T
+    1000, easing = "elastic", redraw = T
   ) %>%
   
      add_annotations(text = "Hold Ctrl to change pitch and bearing",
