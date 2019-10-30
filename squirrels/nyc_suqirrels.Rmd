@@ -1,0 +1,474 @@
+---
+title: "#TidyTuesday"
+subtitle: "NYC Squirrel Census"
+author: '[Evan W Barba](https://github.com/ewbarba)'
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    lightbox: TRUE
+    gallery: TRUE
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc_depth: '1'
+---
+
+# Import libraries and data
+```{r}
+rm(list=ls())
+
+#define packages desired
+dependencies <- c("tidyverse",
+                  "plotly",
+                  "ggmap",
+                  "countrycode",
+                  "lubridate",
+                  "magrittr",
+                  "sp",
+                  "rgdal",
+                  "geosphere",
+                  "dismo",
+                  "rgeos",
+                  "leaflet",
+                  "crosstalk"
+                  )
+
+#check if pacakges are installed - load if so, install+load if not)
+for (i in dependencies) {
+  if (i %in% row.names(installed.packages())){
+    eval(bquote(library(.(i))))
+    message(paste("loaded package",i))
+    }  else {
+    install.packages(i)
+    eval(bquote(library(.(i))))
+  }
+}
+
+nyc_squirrels <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-10-29/nyc_squirrels.csv")
+
+Sys.setenv('MAPBOX_TOKEN'="pk.eyJ1IjoiZXdiYXJiYSIsImEiOiJjazJiMnpkMW8yNGsxM2V0Y2MzdDE3MTlxIn0.iN9sRfB1tVJmcp5rivitGw")
+```
+
+# Data wranglin'
+```{r}
+nyc_squirrels <- nyc_squirrels %>% mutate(date = mdy(date))
+#nyc_squirrels$date <- as.character(nyc_squirrels$date)
+strptime(nyc_squirrels$date[1], "%d%m%Y")
+#nyc_squirrels$shift %<>% as.factor
+nyc_squirrels$primary_fur_color <-  replace(nyc_squirrels$primary_fur_color, is.na(nyc_squirrels$primary_fur_color), "unknown")
+```
+
+# Daily distribution by shift
+```{r}
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~shift,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           shift, "</br>"),
+              colors = c('gold', 'grey4'),
+              mode='markers',
+              frame=~date,
+              visible=T) %>%
+
+  layout(title="Daily distribution by Shift",
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-30,
+      pitch=45,
+      style='basic'),
+    updatemenus = list(
+        list(type='buttons',
+                direction = "right",
+                yanchor = "bottom",
+                x = 1,
+                y = 0,
+                buttons=list(
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "basic")),
+                      label = "Basic"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "dark")),
+                      label = "Dark"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "satellite")),
+                      label = "Satellite")
+                  )
+             ))
+    ) %>%
+  
+  animation_opts(
+    100, easing = "elastic", redraw = T
+  ) %>%
+  
+     add_annotations(text = "Hold Ctrl to change pitch and bearing",
+                     xref = "paper", yref = "paper",
+                     x = 0, xanchor = "left",
+                     y = 0, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#264E86',
+                              family = 'sans serif',
+                              size = 14))
+
+```
+
+# Daily distribution by Primary Fur Color
+```{r}
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~primary_fur_color,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           shift, "</br>"),
+              colors = c('grey4', 'tan3', 'grey', 'purple'),
+              mode='markers',
+              frame=~date,
+              visible=T) %>%
+
+  layout(title="Daily distribution by Primary Fur Color",
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-30,
+      pitch=45,
+      style='basic'),
+    updatemenus = list(
+        list(type='buttons',
+                direction = "right",
+                yanchor = "bottom",
+                x = 1,
+                y = 0,
+                buttons=list(
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "basic")),
+                      label = "Basic"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "dark")),
+                      label = "Dark"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "satellite")),
+                      label = "Satellite")
+                  )
+             ))
+    ) %>%
+  
+  animation_opts(
+    100, easing = "elastic", redraw = T
+  ) %>%
+  
+     add_annotations(text = "Hold Ctrl to change pitch and bearing",
+                     xref = "paper", yref = "paper",
+                     x = 0, xanchor = "left",
+                     y = 0, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#264E86',
+                              family = 'sans serif',
+                              size = 14))
+```
+
+# Daily distribution by Primary Fur Color
+```{r}
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~location,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           shift, "</br>"),
+              colors = c('brown3', 'green3', 'grey'),
+              mode='markers',
+              frame=~date,
+              visible=T) %>%
+
+  layout(title="Daily distribution by Primary Fur Color",
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-30,
+      pitch=45,
+      style='basic'),
+    updatemenus = list(
+        list(type='buttons',
+                direction = "right",
+                yanchor = "bottom",
+                x = 1,
+                y = 0,
+                buttons=list(
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "basic")),
+                      label = "Basic"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "dark")),
+                      label = "Dark"),
+                  
+                  list(method = "relayout",
+                      args = list(list(mapbox.style = "satellite")),
+                      label = "Satellite")
+                  )
+             ))
+    ) %>%
+  
+  animation_opts(
+    100, easing = "elastic", redraw = T
+  ) %>%
+  
+     add_annotations(text = "Hold Ctrl to change pitch and bearing",
+                     xref = "paper", yref = "paper",
+                     x = 0, xanchor = "left",
+                     y = 0, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#264E86',
+                              family = 'sans serif',
+                              size = 14))
+```
+
+
+```{r}
+sp.mydata <- nyc_squirrels
+coordinates(sp.mydata) <- ~long+lat
+d <- gDistance(sp.mydata, byid=T)
+min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
+newdata <- cbind(nyc_squirrels, nyc_squirrels[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
+
+colnames(newdata) <- c(colnames(nyc_squirrels), 'neighbor', 'n.lat', 'n.long', 'n.area', 'n.canopy', 'n.avg.depth', 'distance')
+
+newdata
+```
+
+
+```{r}
+nyc_squirrels %>% 
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~primary_fur_color,
+              ids=~unique_squirrel_id,
+              text=~paste0(location),
+              colors = c('black', 'tan3', 'grey', 'purple'),
+              mode='markers') %>%
+
+  layout(
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-61,
+      pitch=0,
+      style='basic', uirevision=T),
+     legend = list(x=100,y=.5, text='title')
+      )
+
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~shift,
+              ids=~unique_squirrel_id,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           location, "</br>"),
+              colors = c('gold', 'grey4'),
+              mode='markers', 
+              frame=~date) %>%
+
+  layout(
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-30,
+      pitch=45,
+      style='basic', uirevision=T),
+     legend = list(x=100,y=.5, text='title')
+      ) %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  ) %>%
+     add_annotations(text = "Hold Ctrl to change pitch and bearing",
+                     xref = "paper",
+                     yref = "paper",
+                     x = .75, 
+                     xanchor = "left",
+                     y = 0,
+                     yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE)
+
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~primary_fur_color,
+              ids=~unique_squirrel_id,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           location, "</br>"),
+              colors = c('gold', 'grey4'),
+              mode='markers', 
+              frame=~date) %>%
+
+  layout(
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-61,
+      pitch=0,
+      style='basic', uirevision=T),
+     legend = list(x=100,y=.5, text='title')
+      ) %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+```
+
+```{r}
+fur <- nyc_squirrels %>% group_by(date, primary_fur_color) %>% summarise(n())
+shift <- nyc_squirrels %>% group_by(date, shift) %>% summarise(n())
+activity <- nyc_squirrels %>% group_by(date, shift, running, chasing, climbing, eating, foraging) %>% summarise(n())
+noise <- nyc_squirrels %>% group_by(date, kuks, quaas, moans) %>% summarise(n())
+tail <- nyc_squirrels %>% group_by(date, tail_flags, tail_twitches) %>% summarise(n())
+behaviour <- nyc_squirrels %>% group_by(date, approaches, indifferent, runs_from) %>% summarise(n())
+location <- nyc_squirrels %>% group_by(date, location) %>% summarise(n())
+```
+
+```{r}
+shift$date <- as.factor(shift$date)
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, shift) %>% summarise(n=n()) %>%
+  plot_ly(labels = ~shift, values = ~n, frame=~date) %>%
+  add_pie(hole = 0.4) %>%
+  layout(title = "Donut charts using Plotly",  showlegend = F,
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, primary_fur_color) %>% summarise(n=n()) %>%
+  plot_ly(labels = ~primary_fur_color, values = ~n, frame=~date, colors=c('grey4','tan3','grey','black')) %>%
+  add_pie(hole = 0.4) %>%
+  layout(title = "Donut charts using Plotly",  showlegend = T,
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+
+
+nyc_squirrels %>% 
+  mutate(date=as.factor(date)) %>%
+  mutate(day.num=as.numeric(date)) %>%
+  group_by(date, day.num, shift) %>%
+  summarise(n=n()) %>%
+    plot_ly(x = ~day.num,
+            y = ~n,
+            split= ~shift,
+            mode = 'line',
+            type="scatter",
+            frame=~date %>%
+  animation_opts(
+    frame = 100, 
+    transition = 0, 
+    redraw = FALSE)
+
+test <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% mutate(day.num=as.numeric(date)) %>% group_by(date, day.num, shift) %>% summarise(n=n())
+plot_ly(test, x=~day.num, y=~n, color=~shift, mode='line') 
+```
+
+
+
+
+
+#############experimental zone / land of broken dreams#############333
+
+```{r}
+nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox() %>%
+  add_trace(lon=~long, lat=~lat,
+              color=~shift,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           shift, "</br>"),
+              colors = c('gold', 'grey4'),
+              mode='markers',
+              #frame=~date,
+              visible=F) %>%
+  
+  add_trace(lon=~long, lat=~lat,
+              color=~primary_fur_color,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           shift, "</br>"),
+              colors = c('grey3', 'tan3', 'grey'),
+              mode='markers', 
+              #frame=~date,
+              visible=F) %>%
+  layout(
+    updatemenus = list(
+      list(
+        type='buttons',
+        y = 0.8,
+        buttons = list(
+          
+          list(
+            method = "restyle",
+               args = list("visible", list(T,F)),
+               label = "Shift"),
+          
+          list(
+            method = "restyle",
+               args = list("visible", list(F,T)),
+               label = "Fur Color"))
+      )))
+  
+```
+
+```{r}
+p <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, primary_fur_color) %>% summarise(n=n()) %>%
+  plot_ly(labels = ~primary_fur_color, values = ~n, frame=~date, colors=c('grey4','tan3','grey','black')) %>%
+  add_pie(hole = 0.4) %>%
+  layout(title = "Donut charts using Plotly",  showlegend = T,
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>% highlight("plotly_selected")
+map <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+  plot_mapbox(lon=~long, lat=~lat,
+              color=~shift,
+              ids=~unique_squirrel_id,
+              text=~paste0("</br>", 
+                           location, "</br>",
+                           primary_fur_color, "</br>",
+                           location, "</br>"),
+              colors = c('gold', 'grey4'),
+              mode='markers', 
+              frame=~date) %>%
+
+  layout(
+    mapbox=list(
+      center=list(lon=~median(long), lat=~median(lat)), 
+      zoom =13, 
+      bearing=-30,
+      pitch=45,
+      style='basic', uirevision=T),
+     legend = list(x=100,y=.5, text='title')
+      ) %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  ) %>%
+     add_annotations(text = "Hold Ctrl to change pitch and bearing",
+                     xref = "paper",
+                     yref = "paper",
+                     x = .75, 
+                     xanchor = "left",
+                     y = 0,
+                     yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE)
+bscols(map, p)
+```
+
