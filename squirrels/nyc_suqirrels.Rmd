@@ -59,7 +59,7 @@ nyc_squirrels$age <- gsub("?", NA, nyc_squirrels$age, fixed=T)
 
 # Daily distribution by shift
 ```{r}
-nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+pex_map.shift <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
   plot_mapbox(lon=~long, lat=~lat,
               color=~shift,
               text=~paste0("</br>", 
@@ -115,6 +115,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
                               family = 'sans serif',
                               size = 14))
 
+pex_map.shift
 ```
 
 > Click and drag to pan, hold Ctrl to change camera angle and orientation. This plot shows the distribution of squirrels in the am (gold) and pm (black) surveys on each day. The slider at the bottom can be used to change observational day.
@@ -122,7 +123,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
 
 # Daily distribution by Primary Fur Color
 ```{r}
-nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+pex_map.fur <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
   plot_mapbox(lon=~long, lat=~lat,
               color=~primary_fur_color,
               text=~paste0("</br>", 
@@ -177,13 +178,14 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
                      font = list(color = '#264E86',
                               family = 'sans serif',
                               size = 14))
+pex_map.fur
 ```
 
 > Click and drag to pan, hold Ctrl to change camera angle and orientation. This plot shows the distribution of squirrels by primary fur color on each day. The slider at the bottom can be used to change observational day.
 
 # Daily distribution by Location
 ```{r}
-nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
+pex_map.loc <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
   plot_mapbox(lon=~long, lat=~lat,
               color=~location,
               text=~paste0("</br>", 
@@ -238,6 +240,7 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date) %>%
                      font = list(color = '#264E86',
                               family = 'sans serif',
                               size = 14))
+pex_map.loc
 ```
 
 > Click and drag to pan, hold Ctrl to change camera angle and orientation. This plot shows the distribution of squirrels by location on each day. The slider at the bottom can be used to change observational day.
@@ -288,7 +291,7 @@ for_neighbor_plot$pair <-  factor(for_neighbor_plot$pair, levels = c("Same Age",
 ```
 
 ```{r}
-neighboors %>% filter(!is.na(age)) %>%
+pex_violin.fur <- neighboors %>% filter(!is.na(age)) %>%
   plot_ly(y=~distance,
           x=~primary_fur_color,
           type='violin',
@@ -301,11 +304,11 @@ neighboors %>% filter(!is.na(age)) %>%
     yaxis=list(title='Distance from closest neighbor (m)'),
     xaxis=list(title='Primary Fur Color')
   )
-
+pex_violin.fur
 ```
 
 ```{r}
-neighboors %>% filter(!is.na(age)) %>%
+pex_violin.age <- neighboors %>% filter(!is.na(age)) %>%
   plot_ly(y=~distance,
           x=~age,
           type='violin',
@@ -318,12 +321,13 @@ neighboors %>% filter(!is.na(age)) %>%
     yaxis=list(title='Distance from closest neighbor (m)'),
     xaxis=list(title='Age Class')
   )
+pex_violin.age
 ```
 
 # Frequency of nearest neighbor sharing characteristics
 
 ```{r}
-for_neighbor_plot %>% 
+pex_bar <- for_neighbor_plot %>% 
   
   plot_ly() %>%
     add_trace(x=~pair, y=~freq, type = 'bar',
@@ -335,13 +339,14 @@ for_neighbor_plot %>%
          xaxis= list(title="")
   
   )
+pex_bar
 ```
 
 > This plot represents the frequency a given squirrels nearest neighbor shared the characteristics listed on the xaxis. Numbers indicate the average nearest neighbor distance in meters for a given category.
 
 ```{r}
 
-nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, shift) %>% summarise(n=n()) %>%
+pex_pie.shift <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, shift) %>% summarise(n=n()) %>%
   plot_ly(labels = ~shift, 
           values = ~n,
           marker=list(colors=c('rgb(255,215,0)','rgb(30,30,30)')),
@@ -350,22 +355,36 @@ nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, shift) %>% sum
   layout(title = "Daily counts per Shift",  showlegend = T,
          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+pex_pie.shift
 ```
 
 > Daily proportion of counts per shift. Gold taken during AM, black during PM
 
 ```{r}
 
-nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, primary_fur_color) %>% summarise(n=n()) %>%
+pex_pie.fur <- nyc_squirrels %>% mutate(date=as.factor(date)) %>% group_by(date, primary_fur_color) %>% summarise(n=n()) %>%
   plot_ly(labels = ~primary_fur_color, values = ~n, frame=~date, marker=list(colors=c('rgb(30,30,30)','rgb(205,133,63)','rgb(100,100,100)','rgb(160,32,240)'))) %>%
   add_pie(hole = 0.4) %>%
   layout(title = "Daily Proportions of Primary Fur Color",  showlegend = T,
          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-
+pex_pie.fur
 ```
 
 > Daily breakdown of Primary Fur Color
+
+#add all plots to plotly api for upload
+```{r}
+api_create(pex_map.shift, filename = "Daily Distribution by Shift")
+api_create(pex_map.fur, filename = "Daily Distribution by Fur")
+api_create(pex_map.loc, filename = "Daily Distribution by Location")
+api_create(pex_violin.fur, filename = "Nearest Neighbor by Fur")
+api_create(pex_violin.age, filename = "Nearest Neighbor by Age")
+api_create(pex_bar, filename = "Nearest Neighbor Similarity Frequency")
+api_create(pex_pie.shift, filename = "Daily Proportions by Shift")
+api_create(pex_map.fur, filename = "Daily Proportions by Fur")
+```
+
 
 ```{r, include=F, echo=F}
 #############experimental zone / land of broken dreams#############

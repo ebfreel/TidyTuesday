@@ -15,8 +15,11 @@ output:
 ---
 
 ```{r}
+proj <- "horror_movies"
+
+rm(list=ls())
 #define packages desired
-dependencies <- c("tidyverse", "plotly", "ggmap", "quantmod", "countrycode", "mgcv", "broom")
+dependencies <- c("tidyverse", "plotly", "ggmap", "quantmod", "countrycode", "mgcv", "broom", "here")
 
 #check if pacakges are installed - load if so, install+load if not)
 for (i in dependencies) {
@@ -41,7 +44,14 @@ horror_movies <-
 
 Use google's api to gather lat and long of filming locations
 ```{r, message=FALSE}
-locations <- horror_movies %>% filter(!is.na(filming_locations)) %>% mutate_geocode(.,filming_locations)
+if ("locations.csv" %in% list.files(paste0(here(),"/",proj))){
+  message("file found. loading from local")
+  locations <- read.csv(paste0(here(),"/",proj,"/locations.csv"))
+  } else {
+    message("file not found, generating lat long data")
+  locations <- horror_movies %>% filter(!is.na(filming_locations)) %>% mutate_geocode(.,filming_locations)
+  write.csv(locations, paste0(here(),"/",proj,"/locations.csv"))
+}
 ```
 
 Data wringlin'
@@ -94,7 +104,7 @@ horror_movies$continent <- countrycode(sourcevar = horror_movies$release_country
 
 ```{r}
 #generate figure
-plot_ly(horror_movies,
+budget_v_review <- plot_ly(horror_movies,
         y=~review_rating,
         x=~log(value.in.usd),
         color=~continent,
@@ -133,6 +143,8 @@ plot_ly(horror_movies,
            layer='below'
         )
       )
+budget_v_review
+api_create(budget_v_review, filename = "Review vs Budget")
 ```
 
 >This figure shows the relationship between budget (log scale, converted to USD) and rating. Each maker is sized by runtime and colored by continental origin.
@@ -161,7 +173,7 @@ g <- list(
     )
   ))
 
-plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
+globe <- plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
          text = ~paste0('<b>',title,'</b>', '<br>','<br>',
                       'Filimg Location: ', filming_locations, '<br>',
                       'Review rating: ', review_rating, '<br>',
@@ -185,15 +197,10 @@ plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250),
   layout(title = 'The World\'s Spookiest Places (if filming locations are an indicator)', geo = g,
          legend = list(x=100,y=.5))
          
-
-
-
+api_create(globe, filename = "Spooky Filming Locations")
 ```
 
 >This plot displays all filming locations from the provided dataset. Each marker is sized by movie rating and colored by continent of release
-
-
-
 
 #####Bonus I have not gotten to yet
 
