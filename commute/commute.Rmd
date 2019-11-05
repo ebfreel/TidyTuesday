@@ -1,0 +1,1322 @@
+---
+title: "#TidyTuesday"
+subtitle: "Daily Commute"
+author: '[Evan W Barba](https://github.com/ewbarba)'
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    lightbox: TRUE
+    gallery: TRUE
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc_depth: '1'
+---
+
+# Import libraries and data
+```{r, message=T}
+rm(list=ls())
+
+proj <- "commute"
+
+#define packages desired
+dependencies <- c("tidyverse",
+                  "plotly",
+                  "here"
+                  )
+
+#check if pacakges are installed - load if so, install+load if not)
+for (i in dependencies) {
+  if (i %in% row.names(installed.packages())){
+    eval(bquote(library(.(i))))
+    message(paste("loaded package",i))
+    }  else {
+    install.packages(i)
+    eval(bquote(library(.(i))))
+    message(paste("installed and loaded package",i))
+  }
+}
+
+#set mapbox token (free from https://account.mapbox.com/)
+#Sys.setenv('MAPBOX_TOKEN'="<SET_YOUR_TOKEN_HERE>")
+```
+
+```{r}
+#read in data
+commute_mode <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-11-05/commute.csv")
+```
+
+
+```{r}
+#read in data
+commute_mode <- commute_mode %>% mutate("city_state" = paste0(city, ", ", state))
+
+#add_lat_long
+if ("locations.csv" %in% list.files(paste0(here(),"/",proj))){
+  message("file found. loading from local")
+  locations <- read.csv(paste0(here(),"/",proj,"/locations.csv"))
+  } else {
+    message("file not found, generating lat long data")
+    locations <- commute_mode %>% mutate_geocode(.,city_state)
+    write.csv(locations, paste0(here(),"/",proj,"/locations.csv"))
+  }
+
+#summary state by mode
+locations <- locations %>% group_by(state) %>% mutate(state.tot=sum(n))
+
+#summary state by mode
+locations <- locations %>% group_by(state, mode) %>% mutate(state.mode.tot=sum(n))
+
+#summary state by city size and mode
+locations <- locations %>% group_by(state, city_size, mode) %>% mutate(state.cat.tot=sum(n))
+
+#wrangle for cloropleth
+#cloro <- locations %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities)
+
+locations_reduced <- locations %>% select(city, city_size, state, mode, n, percent, moe, state_abb, lon, lat, state.mode.tot, state.cat.tot, state.tot)
+
+
+#set geo
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = "#C0C0C0", bgcolor = "#38383a", domain=list(x=c(-1,2), y=c(-1,2)), framewidth=0
+)
+
+#init map
+map <- plot_geo(locationmode = 'USA-states') %>%
+
+  #add individual traces for each subset (mode x city size)  
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Small", mode == "Bike"),
+    z = ~n,
+    hoverinfo="none",
+    locations = ~ state_abb,
+    colorscale = c("Greens"),
+    reversescale = T,
+    visible = T,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Medium", mode == "Bike"),
+    z = ~n, 
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Large", mode == "Bike"),
+    z = ~ n,
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Small", mode == "Walk"),
+    z = ~ n,
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = "
+    "
+  ) %>%
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Medium", mode == "Walk"),
+    z = ~ n,
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = locations_reduced %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities) %>% filter(city_size == "Large", mode == "Walk"),
+    z = ~ n,
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_markers(data = locations_reduced %>% filter(city_size == "Small", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=T
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Medium", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " medium city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Large", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " large city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"),  
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Small", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " small city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>% 
+  add_markers(data = locations_reduced %>% filter(city_size == "Medium", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " medium city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced  %>% filter(city_size == "Large", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              opacity=0.8, 
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " large city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  
+  layout(title = list(text = '<br><br>Commuters by State',
+                      font=list(color = "#008888", size = 20)),
+         geo = g, 
+         autosize=T,
+         margin = list(l=0,r=0, b=0, t=0, pad=0.01),
+         paper_bgcolor = "#38383a",
+         updatemenus = list(
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="right",
+           yanchor="bottom",
+           x=0.499, y=0.075,
+           bgcolor="lightgreen",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(T, F, F, F, F, F,T, F, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Small Cities - Bikers"
+              ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, T, F, F, F, F,F, T, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Medium Cities - Bikers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, T, F, F, F,F, F, T, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Large Cities - Bikers"
+             ))),
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="left",
+           yanchor="bottom",
+           x=.501, y=.075,
+           bgcolor = "lightblue",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, T, F, F,F, F, F, T, F, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Small Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, T, F,F, F, F, F, T, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Medium Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, F, T,F, F, F, F, F, T),
+                 colorscale = c("Blues")
+               )),
+               label = "Large Cities - Walkers"
+             )
+           )
+         ))) %>%
+  add_annotations(text = "Hover for breakdown - Use bottons to change city size and Commuter Mode",
+                     xref = "paper", yref = "paper",
+                     x = .05, xanchor = "left",
+                     y = .05, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#008888',
+                              size = 11))
+map
+
+api_create(map, filename = "Daily commuter map")
+
+
+```
+
+> Representation of daily commuters by location surveyed. Buttons the map toggle by city size (small, medium or large) and commute mode (bikers or walkers). Each state is colored by total number of commuters of the selected mode and each yellow marker indicates individual cities surveye. Highlight individual cities to get more detailed information about 
+
+#Spliting to meet plotly api_create() upload limits
+
+# Cloropleth
+```{r}
+cholo_data <- locations_reduced %>% group_by(state, state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent), state.cat.tot=mean(state.cat.tot), state.mode.tot=mean(state.mode.tot), state.tot=mean(state.tot)) %>% mutate(per.city=n/num.cities) 
+
+cloro <- plot_geo(locationmode = 'USA-states') %>%
+
+  #add individual traces for each subset (mode x city size)  
+  add_trace(
+    data =cholo_data %>% filter(city_size == "Small", mode == "Bike"),
+    z = ~n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    locations = ~ state_abb,
+    colorscale = c("Greens"),
+    reversescale = T,
+    visible = T,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = cholo_data %>% filter(city_size == "Medium", mode == "Bike"),
+    z = ~n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = cholo_data %>% filter(city_size == "Large", mode == "Bike"),
+    z = ~ n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = cholo_data %>% filter(city_size == "Small", mode == "Walk"),
+    z = ~ n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = "
+    "
+  ) %>%
+  add_trace(
+    data = cholo_data %>% filter(city_size == "Medium", mode == "Walk"),
+    z = ~ n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    hoverinfo="none",
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  add_trace(
+    data = cholo_data %>% filter(city_size == "Large", mode == "Walk"),
+    z = ~ n,
+    text = ~paste0("</br>", state, "<br />",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+    locations = ~ state_abb,
+    reversescale = T,
+    visible = F,
+    marker = list(line = list(
+      color = toRGB("lightgrey"), width = 0.5
+    )),
+    colorbar = list(
+      title = list(text = "Walkers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30
+    ),
+    name = ""
+  ) %>%
+  
+  layout(title = list(text = '<br><br>Commuters by State',
+                      font=list(color = "#008888", size = 20)),
+         geo = g, 
+         autosize=T,
+         margin = list(l=0,r=0, b=0, t=0, pad=0.01),
+         paper_bgcolor = "#38383a",
+         updatemenus = list(
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="right",
+           yanchor="bottom",
+           x=0.499, y=0.075,
+           bgcolor="lightgreen",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(T, F, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Small Cities - Bikers"
+              ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, T, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Medium Cities - Bikers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, T, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Large Cities - Bikers"
+             ))),
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="left",
+           yanchor="bottom",
+           x=.501, y=.075,
+           bgcolor = "lightblue",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, T, F, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Small Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, T, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Medium Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, F, T),
+                 colorscale = c("Blues")
+               )),
+               label = "Large Cities - Walkers"
+             )
+           )
+         ))) %>%
+  add_annotations(text = "Hover for breakdown - Use bottons to change city size and Commuter Mode",
+                     xref = "paper", yref = "paper",
+                     x = .05, xanchor = "left",
+                     y = .05, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#008888',
+                              size = 11))
+cloro
+api_create(cloro, filename = "Daily commuter Cloropleth")
+```
+
+```{r}
+#read in data
+commute_mode <- commute_mode %>% mutate("city_state" = paste0(city, ", ", state))
+
+#add_lat_long
+if ("locations.csv" %in% list.files(paste0(here(),"/",proj))){
+  message("file found. loading from local")
+  locations <- read.csv(paste0(here(),"/",proj,"/locations.csv"))
+  } else {
+    message("file not found, generating lat long data")
+    locations <- commute_mode %>% mutate_geocode(.,city_state)
+    write.csv(locations, paste0(here(),"/",proj,"/locations.csv"))
+  }
+
+#summary state by mode
+locations <- locations %>% group_by(state) %>% mutate(state.tot=sum(n))
+
+#summary state by mode
+locations <- locations %>% group_by(state, mode) %>% mutate(state.mode.tot=sum(n))
+
+#summary state by city size and mode
+locations <- locations %>% group_by(state, city_size, mode) %>% mutate(state.cat.tot=sum(n))
+
+#wrangle for cloropleth
+#cloro <- locations %>% group_by(state_abb, city_size, mode) %>% summarise(n=sum(n), num.cities=n(), prop=mean(percent)) %>% mutate(per.city=n/num.cities)
+
+locations_reduced <- locations %>% select(city, city_size, state, mode, n, percent, moe, state_abb, lon, lat, state.mode.tot, state.cat.tot, state.tot)
+
+
+#set geo
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = "#C0C0C0", bgcolor = "#38383a", domain=list(x=c(-1,2), y=c(-1,2)), framewidth=0
+)
+
+#init map
+points <- plot_mapbox(locationmode = 'USA-states') %>%
+
+  #add individual traces for each subset (mode x city size)  
+  add_markers(data = locations_reduced %>% filter(city_size == "Small", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n,
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " small city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=T
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Medium", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " medium city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Large", mode == "Bike"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " bikers / ", state.mode.tot, " ", state_abb, " bikers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " bikers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " large city bikers / ", state.mode.tot, " ", state_abb, " bikers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " bikers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"),  
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced %>% filter(city_size == "Small", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n, 
+              hoverinfo = "text",
+               text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " small city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>% 
+  add_markers(data = locations_reduced %>% filter(city_size == "Medium", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n, 
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " medium city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  add_markers(data = locations_reduced  %>% filter(city_size == "Large", mode == "Walk"),
+              type="scattergeo",
+              x = ~lon, 
+              y = ~lat, 
+              marker=list(color = "#FFDE03",
+                          line=list(color="#FFDE03")),
+              size=~n, 
+              hoverinfo = "text",
+              text = ~paste0(city, " ", state_abb, "<br />",
+                            mode, ": ", n, " (", percent, "% ", "&plusmn;", moe, ")", "</br></br>",
+                            
+                            n, " ",city, " walkers / ", state.mode.tot, " ", state_abb, " walkers ",
+                            "(", round(100*n/state.mode.tot,2), "%)</br>",
+                            n, " ",city, " walkers / ", state.tot, " ", state_abb, " commuters ",
+                            "(", round(100*n/state.tot,2), "%)","</br></br>",
+                            
+                            "-----Satewide-----</br>",
+                            state.cat.tot, " ", state_abb, " large city walkers / ", state.mode.tot, " ", state_abb, " walkers  ",
+                            "(", round(100*state.cat.tot/state.mode.tot,2), "%)</br>",
+                            state.mode.tot, " ", state_abb, " walkers / ", state.tot, " ", state_abb, " commuters  ",
+                            "(", round(100*state.mode.tot/state.tot,2), "%)"), 
+              showlegend=F, visible=F
+  ) %>%
+  
+  layout(title = list(text = '<br><br>Commuters by State',
+                      font=list(color = "#008888", size = 20)),
+          mapbox=list(
+                center=list(lon=~median(lon), lat=~median(lat)), 
+                zoom =5, 
+                bearing=0,
+                pitch=15,
+                style='basic'),
+         geo = g, 
+         autosize=T,
+         margin = list(l=0,r=0, b=0, t=0, pad=0.01),
+         paper_bgcolor = "#38383a",
+         updatemenus = list(
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="right",
+           yanchor="bottom",
+           x=0.499, y=0.075,
+           bgcolor="lightgreen",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(T, F, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Small Cities - Bikers"
+              ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, T, F, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Medium Cities - Bikers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, T, F, F, F),
+                 colorscale = c("Greens")
+               )),
+               label = "Large Cities - Bikers"
+             ))),
+           list(
+           type = 'buttons',
+           direction = "right",
+           xanchor="left",
+           yanchor="bottom",
+           x=.501, y=.075,
+           bgcolor = "lightblue",
+           font= list(
+             size=9
+           ),
+           showactive=F,
+           buttons = list(
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, T, F, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Small Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, T, F),
+                 colorscale = c("Blues")
+               )),
+               label = "Medium Cities - Walkers"
+             ),
+             list(
+               method = "update",
+               args = list(list(
+                 visible = c(F, F, F, F, F, T),
+                 colorscale = c("Blues")
+               )),
+               label = "Large Cities - Walkers"
+             )
+           )
+         ))) %>%
+  add_annotations(text = "Hover for breakdown - Use bottons to change city size and Commuter Mode",
+                     xref = "paper", yref = "paper",
+                     x = .05, xanchor = "left",
+                     y = .05, yanchor = "top",
+                     legendtitle = TRUE,
+                     showarrow = FALSE,
+                     font = list(color = '#008888',
+                              size = 11))
+points
+
+#api_create(points, filename = "Daily commuter map")
+```
+
+
+# Finished!
+```{r}
+shell.exec("https://www.youtube.com/watch?v=TRgdA9_FsXM")
+```
+
+
+###########################3
+#leftovers
+```{r, include=F}
+# library(sp)
+# library(maps)
+# library(maptools)
+# 
+# # The single argument to this function, pointsDF, is a data.frame in which:
+# #   - column 1 contains the longitude in degrees (negative in the US)
+# #   - column 2 contains the latitude in degrees
+# 
+# latlong2county <- function(pointsDF) {
+#     # Prepare SpatialPolygons object with one SpatialPolygon
+#     # per county
+#     counties <- map('county', fill=TRUE, col="transparent", plot=FALSE)
+#     IDs <- sapply(strsplit(counties$names, ":"), function(x) x[1])
+#     counties_sp <- map2SpatialPolygons(counties, IDs=IDs,
+#                      proj4string=CRS("+proj=longlat +datum=WGS84"))
+# 
+#     # Convert pointsDF to a SpatialPoints object 
+#     pointsSP <- SpatialPoints(pointsDF, 
+#                     proj4string=CRS("+proj=longlat +datum=WGS84"))
+# 
+#     # Use 'over' to get _indices_ of the Polygons object containing each point 
+#     indices <- over(pointsSP, counties_sp)
+# 
+#     # Return the county names of the Polygons object containing each point
+#     countyNames <- sapply(counties_sp@polygons, function(x) x@ID)
+#     countyNames[indices]
+# }
+# 
+# # Test the function using points in Wisconsin and Oregon.
+# locations$county <- latlong2county(locations[,c("lon","lat")])
+# 
+# g <- list(
+#   scope = 'usa',
+#   projection = list(type = 'albers usa'),
+#   showland = TRUE,
+#   landcolor = toRGB("gray85"),
+#   subunitwidth = 1,
+#   countrywidth = 1,
+#   subunitcolor = toRGB("white"),
+#   countrycolor = toRGB("white")
+# )
+# 
+# p <- plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250)) %>%
+#   add_markers(
+#     x = ~lon, y = ~lat, color = ~mode, size=~n, opacity=~1-moe, 
+#     hoverinfo = "text",
+#     text = ~paste(locations$city, "<br />", locations$n, locations$mode)
+#   ) %>%
+#   layout(title = 'TITLE(Click legend to toggle)', geo = g)
+# p
+# 
+# # Create a shareable link to your chart
+# # Set up API credentials: https://plot.ly/r/getting-started
+# #chart_link = api_create(p, filename="TITLE")
+# #chart_link
+# 
+#  plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250)) %>%
+#   add_markers(
+#     x = ~lon, y = ~lat, color = ~mode, size=~percent, hoverinfo = "text",
+#     text = ~paste(locations$city, "<br />", locations$n, locations$mode)
+#   ) %>%
+#   layout(title = 'TITLE(Click legend to toggle)', geo = g)
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~n, color=~city_size)
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~n, color=~mode)
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~percent, color=~city_size)
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~percent, color=~mode)
+# 
+# 
+# 
+# stations <- ghcnd_stations()
+# 
+# locs <- locations %>% rename(id = city) %>% select(c(id, lon, lat))
+# locs <- locs %>% rename(latitude = lat)
+# locs <- locs %>% rename(longitude = lon)
+# 
+# all_stations <- meteo_nearby_stations(lat_lon_df =  locs, station_data = stations, limit = 1, year_min = 2008, year_max = 2012, var = "all")
+# 
+# all_stations <- unique(bind_rows(all_stations))
+# monitors <- all_stations$id
+# 
+# 
+# if ("weather.csv" %in% list.files(paste0(here(),"/",proj))){
+#   message("file found. loading from local")
+#   weather_data <- read.csv(paste0(here(),"/",proj,"/weather.csv"))
+#   } else {
+#     message("file not found, generating lat long data")
+#     weather_data <- meteo_pull_monitors(monitors, date_min = "2008-01-01", date_max = "2012-12-31")
+#     write.csv(weather_data, paste0(here(),"/",proj,"/weather.csv"))
+# }
+# 
+# weather_data_red <- weather_data %>% mutate(tdiff=tmax-tmin) %>% select("id", "date", "prcp", "tmax","tmin","tdiff")
+# 
+# weather2 <- left_join(all_stations, weather_data_red)
+# 
+# weather_means <- weather2 %>% group_by(id) %>% summarise(avg.prcp=mean(prcp, na.rm = T),
+#                                         avg.tmax=mean(tmax, na.rm = T),
+#                                         avg.tmin=mean(tmin, na.rm = T),
+#                                         avg.tdiff=mean(tdiff, na.rm = T),
+#                                         n=n(),
+#                                         lat=mean(latitude),
+#                                         lon=mean(longitude),
+#                                         distance=mean(distance))
+# 
+# coordinates(weather_means) <- ~lon+lat
+# loc_cords <- locations
+# coordinates(loc_cords) <- ~lon+lat
+# 
+# closestSiteVec <- vector(mode = "numeric",length = nrow(loc_cords))
+# minDistVec <- vector(mode = "numeric",length = nrow(loc_cords))
+# 
+#  for (i in 1 : nrow(loc_cords)){
+#     distVec <- spDistsN1(weather_means,loc_cords[i,],longlat = TRUE)
+#     minDistVec[i] <- min(distVec)
+#     closestSiteVec[i] <- which.min(distVec)
+#  }
+# 
+# FinalTable = data.frame(city=as.character(loc_cords$city),
+#                         coordinates(loc_cords),
+#                         minDistVec,
+#                         avg.prcp=as.numeric(weather_means[closestSiteVec,]$avg.prcp),
+#                         avg.tmax=as.numeric(weather_means[closestSiteVec,]$avg.tmax),
+#                         avg.tmin=as.numeric(weather_means[closestSiteVec,]$avg.tmin),
+#                         avg.tdiff=as.numeric(weather_means[closestSiteVec,]$avg.tdiff),
+#                         closest_station=as.character(weather_means[closestSiteVec,]$id),
+#                         n.obs=as.numeric(weather_means[closestSiteVec,]$n),
+#                         station_distance=as.numeric(weather_means[closestSiteVec,]$distance))
+# 
+# FinalTable <- FinalTable %>% distinct(city, .keep_all=T)
+# 
+# FinalTable <- left_join(commute_mode,FinalTable)
+# 
+# plot_geo(locations, locationmode = 'USA-states', sizes = c(1, 250)) %>%
+#   add_markers(
+#     x = ~lon, y = ~lat, color = ~mode, size=~n, opacity=~1-moe, 
+#     hoverinfo = "text",
+#     text = ~paste(locations$city, "<br />", locations$n, locations$mode)
+#   ) %>%
+#   layout(title = 'TITLE(Click legend to toggle)', geo = g)
+# 
+# FinalTable %>% filter(n>50) %>%
+#   plot_ly(x=~avg.prcp, y=~percent, color=~city_size, text=~paste(city,) size=~n.obs)
+# 
+# FinalTable %>%
+#   plot_ly(x=~avg.prcp, y=~percent, color=~mode)
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.prcp, y=percent, color=mode)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.prcp, y=percent, color=city_size)) +
+#   geom_point() + stat_smooth()
+# 
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tdiff, y=percent, color=mode)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tdiff, y=percent, color=city_size)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tmax, y=percent, color=mode)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tmax, y=percent, color=city_size)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tmin, y=percent, color=mode)) +
+#   geom_point() + stat_smooth()
+# 
+# FinalTable %>%
+#   ggplot(aes(x=avg.tmin, y=percent, color=city_size)) +
+#   geom_point() + stat_smooth()
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~percent, color=~city_size)
+# 
+# locations %>%
+#   plot_ly(x=~lat, y=~percent, color=~mode)
+# 
+# 
+# blank_layer <- list(
+#   title = "",
+#   showgrid = F,
+#   showticklabels = F,
+#   zeroline = F)
+# 
+# county_map <- map_data("county") %>% 
+#   mutate(county=paste0(region,",",subregion)) 
+# 
+# loc.plus.county <- left_join(locations[,-1],county_map[,c("county", "group")]) 
+# 
+# loc.plus.county <- loc.plus.county %>% group_by(state_abb, county, group, city_size, mode) %>%
+#   summarise(tot = sum(n), lat=mean(lat), lon = mean(lon))
+# 
+# loc.plus.county %>%
+#    group_by(group) %>%
+#   plot_ly(
+#     x = ~lon,
+#     y = ~lat,
+#     #color=~n,
+#     colors= c('#ffeda0','#f03b20'),
+#     text=~paste(county,state_abb)
+#     ) %>%
+#   add_polygons(line = list(width = 0.4)) %>%
+#   add_polygons(
+#     fillcolor = 'transparent',
+#     line = list(color = 'black', width = 0.5),
+#     showlegend = FALSE
+#   ) %>%
+#   layout(
+#     title = "California Population by County",
+#     titlefont = list(size = 10),
+#     xaxis = list(title = "", showgrid = FALSE,
+#                  zeroline = FALSE, showticklabels = FALSE),
+#     yaxis = list(title = "", showgrid = FALSE,
+#                  zeroline = FALSE, showticklabels = FALSE)
+#   )
+
+```
+
