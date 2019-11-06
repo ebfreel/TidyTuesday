@@ -494,7 +494,7 @@ map <- plot_geo(locationmode = 'USA-states') %>%
                               size = 11))
 map
 
-api_create(map, filename = "Daily commuter map")
+#api_create(map, filename = "Daily commuter map")
 
 
 ```
