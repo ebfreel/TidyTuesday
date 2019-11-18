@@ -1,0 +1,114 @@
+---
+title: "#TidyTuesday"
+subtitle: "Code in CRAN Packages  - Week 46"
+author: '[Evan W Barba](https://github.com/ewbarba)'
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    lightbox: TRUE
+    gallery: TRUE
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc_depth: '1'
+---
+
+# Import libraries and data
+```{r, message=T}
+rm(list=ls())
+
+proj <- "cran"
+
+#define packages desired
+dependencies <- c("tidyverse",
+                  "plotly",
+                  "here"
+                  #"devtools",
+                  #"tidytuesdaysR"
+                  )
+
+#check if pacakges are installed - load if so, install+load if not)
+for (i in dependencies) {
+  if (i %in% row.names(installed.packages())){
+    eval(bquote(library(.(i))))
+    message(paste("loaded package",i))
+    }  else {
+      if(i == "tidytuesdayR"){
+        devtools::install_github("thebioengineer/tidytuesdayR")
+        eval(bquote(library(.(i))))
+        message(paste("installed and loaded package",i))
+      } else {
+      install.packages(i)
+      eval(bquote(library(.(i))))
+      message(paste("installed and loaded package",i))
+     }
+    }
+  }
+
+#set mapbox token (free from https://account.mapbox.com/)
+#Sys.setenv('MAPBOX_TOKEN'="<SET_YOUR_TOKEN_HERE>")
+```
+
+```{r}
+cran_code <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-11-12/loc_cran_packages.csv")
+```
+
+
+
+```{r}
+
+red <- cran_code  %>% group_by(pkg_name) %>% 
+  summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.comment=sum(comment), tot.file=sum(file)) 
+p2 <- red %>%
+  plot_ly(z = ~log(tot.file), 
+          x = ~log(tot.code), 
+          y = ~log(tot.comment), 
+          color = ~n_lang, 
+          size = 1,
+          text = ~paste0('<b>',pkg_name,'</b>', "<br>",
+                       "Number of Languages: ", n_lang, "<br>",
+                       "Total Files: ", tot.file, "<br>",
+                       "Total Code: ", tot.code, "<br>",
+                       "Total comments: ", tot.comment, "<br>",
+                       "Comment per code: ", round(tot.comment/tot.code, 2)),
+            hoverinfo='text')  %>%
+  layout(title = "<br><br>CRAN packages",
+    scene = list(xaxis = list(title = 'log(Lines of Code)'),
+                     yaxis = list(title = 'log(Comments)'),
+                     zaxis = list(title = 'log(Number of Files)'),
+                 camera = list(
+                   eye = list(
+                     x = 1.25, 
+                     y = -1.25,
+                     z = 0.11)),
+                 aspectratio=list(
+                   x=.75,
+                   y=.75,
+                   z=.75)),
+    margin = list(l=0.1,r=0.1, b=0.1, t=0, pad=0.01),
+         paper_bgcolor = "#0b080f"
+         )
+         
+api_create(p2, filename="CRAN")
+```
+
+```{r}
+cran_code %>% group_by(pkg_name) %>% plot_ly(x=~file, y=~code/n_distinct(language), color=~language)
+
+cran_code %>% ggplot(aes(x=file, y=code)) + geom_point() + stat_smooth()
+
+cran_code %>% group_by(pkg_name) %>% 
+  summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.blank=sum(blank), tot.comment=sum(comment), tot.file=sum(file)) %>%
+    plot_ly(y=~log(tot.comment/tot.code), x=~log(tot.file), color=~n_lang)
+
+cran_code[c(1:10),] %>% plot_ly() %>%
+  add_trace(
+    labels = ~pkg_name,
+    parents = ~language,
+    values = ~log(code),
+    type = 'sunburst',
+    branchvalues = ~'total'
+    ) 
+```
+
