@@ -12,6 +12,8 @@ output:
   html_document:
     df_print: paged
     toc_depth: '1'
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Import libraries and data
@@ -23,6 +25,7 @@ proj <- "cran"
 #define packages desired
 dependencies <- c("tidyverse",
                   "plotly",
+                  "htmlwidgets",
                   "here"
                   #"devtools",
                   #"tidytuesdaysR"
@@ -44,7 +47,15 @@ for (i in dependencies) {
       message(paste("installed and loaded package",i))
      }
     }
-  }
+}
+
+# widget_file_size <- function(p) {
+#   d <- tempdir()
+#   withr::with_dir(d, htmlwidgets::saveWidget(p, "index.html"))
+#   f <- file.path(d, "index.html")
+#   mb <- round(file.info(f)$size / 1e6, 3)
+#   message("File is: ", mb," MB")
+# }
 
 #set mapbox token (free from https://account.mapbox.com/)
 #Sys.setenv('MAPBOX_TOKEN'="<SET_YOUR_TOKEN_HERE>")
@@ -58,9 +69,9 @@ cran_code <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/
 
 ```{r}
 
-red <- cran_code  %>% group_by(pkg_name) %>% 
-  summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.comment=sum(comment), tot.file=sum(file)) 
-p2 <- red %>%
+summary <- cran_code  %>% group_by(pkg_name) %>% 
+  summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.comment=sum(comment), tot.file=sum(file))
+p <- summary %>%
   plot_ly(z = ~log(tot.file), 
           x = ~log(tot.code), 
           y = ~log(tot.comment), 
@@ -89,26 +100,35 @@ p2 <- red %>%
     margin = list(l=0.1,r=0.1, b=0.1, t=0, pad=0.01),
          paper_bgcolor = "#0b080f"
          )
+
+
+
+
+#widget_file_size(p)
          
-api_create(p2, filename="CRAN")
+#api_create(p2, filename="CRAN")
+
+saveWidget(p, paste0(here(),"/docs/cran_scatter.html"), selfcontained = T, libdir = "lib")
+
+p
 ```
 
 ```{r}
-cran_code %>% group_by(pkg_name) %>% plot_ly(x=~file, y=~code/n_distinct(language), color=~language)
-
-cran_code %>% ggplot(aes(x=file, y=code)) + geom_point() + stat_smooth()
-
-cran_code %>% group_by(pkg_name) %>% 
-  summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.blank=sum(blank), tot.comment=sum(comment), tot.file=sum(file)) %>%
-    plot_ly(y=~log(tot.comment/tot.code), x=~log(tot.file), color=~n_lang)
-
-cran_code[c(1:10),] %>% plot_ly() %>%
-  add_trace(
-    labels = ~pkg_name,
-    parents = ~language,
-    values = ~log(code),
-    type = 'sunburst',
-    branchvalues = ~'total'
-    ) 
+# cran_code %>% group_by(pkg_name) %>% plot_ly(x=~file, y=~code/n_distinct(language), color=~language)
+# 
+# cran_code %>% ggplot(aes(x=file, y=code)) + geom_point() + stat_smooth()
+# 
+# cran_code %>% group_by(pkg_name) %>% 
+#   summarise(n_lang=n_distinct(language), tot.code=sum(code), tot.blank=sum(blank), tot.comment=sum(comment), tot.file=sum(file)) %>%
+#     plot_ly(y=~log(tot.comment/tot.code), x=~log(tot.file), color=~n_lang)
+# 
+# cran_code[c(1:10),] %>% plot_ly() %>%
+#   add_trace(
+#     labels = ~pkg_name,
+#     parents = ~language,
+#     values = ~log(code),
+#     type = 'sunburst',
+#     branchvalues = ~'total'
+#     ) 
 ```
 
