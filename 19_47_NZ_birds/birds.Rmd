@@ -1,0 +1,375 @@
+---
+title: "#TidyTuesday"
+subtitle: "New Zealand Bird of the Year  - Week 47"
+author: '[Evan W Barba](https://github.com/ewbarba)'
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    lightbox: TRUE
+    gallery: TRUE
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc_depth: '1'
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Import libraries and data
+```{r, message=T, warning=F}
+rm(list=ls())
+
+proj <- "19_47_NZ_birds"
+
+#define packages desired
+dependencies <- c("tidyverse",
+                  "plotly",
+                  "lubridate",
+                  "htmlwidgets",
+                  "here",
+                  "brickr",
+                  "rayshader",
+                  "jpeg",
+                  "imager"
+                  #"devtools",
+                  #"tidytuesdaysR"
+                  )
+
+#check if pacakges are installed - load if so, install+load if not)
+for (i in dependencies) {
+  if (i %in% row.names(installed.packages())){
+    eval(bquote(library(.(i))))
+    message(paste("loaded package",i))
+    }  else {
+      if(i == "tidytuesdayR"){
+        devtools::install_github("thebioengineer/tidytuesdayR")
+        eval(bquote(library(.(i))))
+        message(paste("installed and loaded package",i))
+      } else {
+      install.packages(i)
+      eval(bquote(library(.(i))))
+      message(paste("installed and loaded package",i))
+     }
+    }
+}
+
+# widget_file_size <- function(p) {
+#   d <- tempdir()
+#   withr::with_dir(d, htmlwidgets::saveWidget(p, "index.html"))
+#   f <- file.path(d, "index.html")
+#   mb <- round(file.info(f)$size / 1e6, 3)
+#   message("File is: ", mb," MB")
+# }
+
+#set mapbox token (free from https://account.mapbox.com/)
+#Sys.setenv('MAPBOX_TOKEN'="<SET_YOUR_TOKEN_HERE>")
+```
+
+```{r}
+nz_bird <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-11-19/nz_bird.csv")
+```
+
+
+```{r}
+beer <- nz_bird %>% filter(.,grepl(paste0((sort(unique(nz_bird$bird_breed))[37]),"|",
+                           sort(unique(nz_bird$bird_breed))[33],"|",
+                           "Moa|Tomtit|Morepork|Hutton's Shearwater|Rifleman"), bird_breed))
+beer$bird_breed <- gsub("South Island ", "", beer$bird_breed)
+beer$rank_num <- as.numeric(gsub("vote_", "", beer$vote_rank))
+beer$star_eqi <- 6-beer$rank_num
+
+beer <- beer %>% mutate(abv=case_when(
+  bird_breed == "Hutton's Shearwater" ~ 5.1,
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ 6.9,
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ 4.8,
+  bird_breed == "Morepork" ~ 7.7,
+  bird_breed == "Rifleman" ~ 4.5,
+  bird_breed == "Tomtit" ~ 5.6),
+  untappd=case_when(
+  bird_breed == "Hutton's Shearwater" ~ 3.73,
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ 3.92,
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ 3.7,
+  bird_breed == "Morepork" ~ 4.05,
+  bird_breed == "Rifleman" ~ 3.61,
+  bird_breed == "Tomtit" ~ 3.86),
+  beer_name=case_when(
+  bird_breed == "Hutton's Shearwater" ~ "Puffinus huttoni",
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ "Kakapo",
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ "Tieke",
+  bird_breed == "Morepork" ~ "Ruru",
+  bird_breed == "Rifleman" ~ "Rifleman XPA",
+  bird_breed == "Tomtit" ~ "Tomtit"),
+  beer_style=case_when(
+  bird_breed == "Hutton's Shearwater" ~ "Boysenberry Sour",
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ "Wet-Hopped India Pale Lager",
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ "Dunkelweizen",
+  bird_breed == "Morepork" ~ "Black IPA",
+  bird_breed == "Rifleman" ~ "XPA",
+  bird_breed == "Tomtit" ~ "Sour Ale")
+)
+
+by_rank <- beer %>% group_by(bird_breed, rank_num) %>% summarise(stars=mean(star_eqi), votes=n()) %>% mutate(weighted=stars*votes) %>% group_by(bird_breed) %>% summarise(wt_votes=sum(weighted)) %>% mutate(abv=case_when(
+  bird_breed == "Hutton's Shearwater" ~ 5.1,
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ 6.9,
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ 4.8,
+  bird_breed == "Morepork" ~ 7.7,
+  bird_breed == "Rifleman" ~ 4.5,
+  bird_breed == "Tomtit" ~ 5.6),
+  untappd=case_when(
+  bird_breed == "Hutton's Shearwater" ~ 3.73,
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ 3.92,
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ 3.7,
+  bird_breed == "Morepork" ~ 4.05,
+  bird_breed == "Rifleman" ~ 3.61,
+  bird_breed == "Tomtit" ~ 3.86),
+  beer_name=case_when(
+  bird_breed == "Hutton's Shearwater" ~ "Puffinus huttoni",
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ "Kakapo",
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ "Tieke",
+  bird_breed == "Morepork" ~ "Ruru",
+  bird_breed == "Rifleman" ~ "Rifleman XPA",
+  bird_breed == "Tomtit" ~ "Tomtit"),
+  beer_style=case_when(
+  bird_breed == "Hutton's Shearwater" ~ "Boysenberry Sour",
+  bird_breed == sort(unique(nz_bird$bird_breed))[33] ~ "Wet-Hopped India Pale Lager",
+  bird_breed == sort(unique(nz_bird$bird_breed))[37] ~ "Dunkelweizen",
+  bird_breed == "Morepork" ~ "Black IPA",
+  bird_breed == "Rifleman" ~ "XPA",
+  bird_breed == "Tomtit" ~ "Sour Ale")
+)
+
+p <- by_rank %>% plot_ly(
+  x=~untappd,
+  y=~wt_votes,
+  size=~wt_votes,
+  color=~abv,
+  text=~beer_name,
+  hovertext=~paste0("<b>", beer_name, "</b><br>",
+               "<i>", beer_style, "</i><br>",
+               "brewed by ParrotDog <br>",
+               "ABV: ", abv, "%","<br> <br>",
+               "Votes (weighted by rank): ", wt_votes, "<br>",
+               "Untappd Score: ", untappd
+  ),
+  name="",
+  textfont=list(
+    family="Oswald",
+    size=18
+  ),
+  textposition = "top"
+ 
+) %>%
+  layout( 
+    coloraxis=list(
+      colorbar = list(
+      title = list(text = "Bikers",
+                   font = list(
+                     family="Overpass",
+                     size=11,
+                     color = "#008888"),
+                     side="top"),
+      bordercolor = "#008888",
+      outlinecolor = "#008888",
+      tickcolor = "#008888",
+      tickfont = list(color = "#008888"),
+      len = 0.75,
+      y = .6, yanchor="center",
+      thickness = 30)),
+    font = list(
+        family = "Oswald"),
+    title = list(
+      text="ParrotDog Rarebird Series in Bird of The Year Voting",
+      family = 'PT Sans Narrow'
+    ),
+    xaxis = list(
+      title = "Untappd Rating",
+      font = list(
+        family = "Oswald"
+      ),
+      showgrid = F,
+      range=c(3.52,4.1)
+    ),
+    yaxis = list(
+      title = "Weighted Votes",
+      font = list(
+        family = "Oswald"
+      ),
+      showgrid = F,
+      range=c(5,45000)
+    ),
+   # margin = list(l=0.1,r=0.1, b=0.1, t=0.1, pad=0.01),
+    images = list(
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-1060368_af8e9_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.695,
+         y=13000,
+         sizex=0.75,
+         sizey=8000,
+         layer="below"),
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-1188941_4e06c_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.96,
+         y=20000,
+         sizex=0.75,
+         sizey=8000,
+         layer="below"), 
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-1181496_2baea_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.67,
+         y=30000,
+          sizex=0.75,
+         sizey=8000,
+         layer="below"), 
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-1048505_f98c3_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.88,
+         y=36000,
+          sizex=0.75,
+         sizey=8000,
+         layer="below"), 
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-2821377_ac62c_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.575,
+         y=21000,
+         sizex=0.75,
+         sizey=8000,
+         layer="below"), 
+      list(source =  "https://untappd.akamaized.net/site/beer_logos_hd/beer-1359368_361fc_hd.jpeg",
+         xref = "x",
+         yref = "y",
+         x=3.82,
+         y=13000,
+         sizex=0.5,
+         sizey=6000,
+         layer="below"),
+      list(source =  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQq2Ww0fP_wOxgSQ1NNrfgtnW3jZmkjTaDruVPk3aW24oy14TDb&s",
+         xref = "x",
+         yref = "y",
+         x=3.51,
+         y=45000,
+         sizex=0.85,
+         sizey=10000,
+         layer="below")
+      
+      
+  )
+)
+
+saveWidget(p, paste0(here(),"/docs/beer.html"), selfcontained = F, libdir = "lib")
+```
+
+
+```{r}
+#assign a voter ID
+nz_bird <- nz_bird %>% add_column(., voterIDs = paste(rep(1:(nrow(nz_bird) / 5), each = 5), .$date, .$hour, sep = "_"))
+
+#start wide round by round data frame for voting tallies
+all.birds <- nz_bird %>% distinct(bird_breed) %>% filter(!is.na(bird_breed)) %>% arrange(bird_breed)
+
+#init while loop for rounds of counting
+MAJORITY <- F
+round <- 1
+
+while(MAJORITY==F){
+  
+  #get per current round votes
+  votes <- nz_bird %>% filter(vote_rank=='vote_1') %>% count(bird_breed, sort = T, name = "votes") %>% filter(!is.na(bird_breed)) %>% mutate()
+  
+  #add to running total and set proportions
+  all.birds <- left_join(all.birds, votes) %>% arrange(desc(votes))
+  colnames(all.birds)[which(colnames(all.birds)=="votes")] <- paste0("round_", round)
+  all.birds <- all.birds %>% arrange(desc(get(paste0("round_", round))))
+  
+  #determine round loser
+  round_loser <- all.birds %>% top_n(1,desc(get(paste0("round_", round)))) %>% .$bird_breed
+  
+  prop <- na.omit(all.birds[,(round+1)] / sum(all.birds[,(round+1)], na.rm = T))
+  
+  #check if any have majority
+  if(any(prop >= 0.5)){
+    MAJORITY=T
+  }
+  
+  
+  #distribute 2nd rank votes from voters who had round_loser as 1st rank
+  losing_voters <- nz_bird %>% filter(vote_rank=='vote_1' & bird_breed %in% round_loser) %>% .$voterIDs
+  
+  votes_to_add <- nz_bird[which(nz_bird$bird_breed %in% round_loser & nz_bird$vote_rank=='vote_1')+1,] %>% filter(vote_rank != 'vote_1') %>% count(bird_breed)
+  votes <- left_join(votes, votes_to_add) %>% filter(bird_breed!=round_loser) %>% mutate(votes = rowSums(.[,c("votes","n")], na.rm=T)) %>% select(-n)
+  
+  nz_bird[which(nz_bird$bird_breed %in% round_loser & nz_bird$vote_rank=='vote_1')+1,'vote_rank'] <- 'vote_1'
+  nz_bird <- nz_bird %>% filter(!(bird_breed %in% round_loser))
+  
+  #set for next round
+  round <- round + 1
+  
+}
+```
+
+```{r}
+all.birds.long <- all.birds %>% gather("round", "votes", -bird_breed)
+
+all.birds.long$round <- as.numeric(gsub("round_", "", all.birds.long$round))
+
+p2 <- all.birds.long %>% 
+  plot_ly(labels = ~bird_breed, 
+          values = ~votes, 
+          frame = ~round,
+          type = 'pie',
+          title = list(
+            text = "Bird of the Year - IRV by round",
+            font = list(
+              family = "Oswald",
+              size = 18
+            ),
+            position = "top left"
+          ),
+          opacity = 0.75,
+          textfont= list(
+            family = "Oswald",
+            size = 15
+          ),
+          textposition = 'inside'
+        ) %>% 
+  layout(
+    transition=list(
+      duration=175,
+      easing='elastic'),
+    paper_bgcolor = "#0b080f",
+    plot_bgcolor = "#0b080f")
+  
+saveWidget(p2, paste0(here(),"/docs/pie.html"), selfcontained = F, libdir = "lib")
+  
+```
+
+
+
+ ```{r}
+# download.file("https://www.pewtrusts.org/-/media/data-visualizations/interactives/2016/penguin_quiz/assets/shutterstock_101664424/shutterstock_101664424_16x9.jpg", paste0(here(),'/',proj,"/hoiho.jpg"), mode = 'wb')
+# download.file("https://rlv.zcache.com/cute_yellow_eyed_penguin_postcard-rc895a82eae2e4b3d8d7e22599e61203d_vgbaq_8byvr_640.jpg", paste0(here(),'/',proj,"/hoiho2.jpg"), mode = 'wb')
+# download.file("https://parrotdog.co.nz/wp-content/uploads/2015/12/tomtit-packshot.png", paste0(here(),'/',proj,"/parrotdog_tomtit.png"), mode = 'wb')
+# download.file("http://brewhound.nz/thumbs/300x300/images/Tomtit_Tap_Badge.jpg1468457741.jpg", paste0(here(),'/',proj,"/parrotdog_tomtit2.jpg"), mode = 'wb')
+# 
+# 
+# png::readPNG(paste0(here(),'/',proj,"/parrotdog_tomtit.png")) %>% 
+#   image_to_mosaic(img_size = 50) %>% bricks_from_mosaic() %>% build_bricks() 
+# 
+# jpeg::readJPEG(paste0(here(),'/',proj,"/parrotdog_tomtit2.jpg")) %>% 
+#   image_to_mosaic(img_size = 200) %>% build_mosaic()
+# 
+# jpeg::readJPEG(paste0(here(),'/',proj,"/parrotdog_tomtit2.jpg")) %>% 
+#   image_to_mosaic(img_size = 200) %>% bricks_from_mosaic() %>% build_bricks()
+# 
+# jpeg::readJPEG(paste0(here(),'/',proj,"/hoiho.jpg")) %>% 
+#   image_to_mosaic(img_size = 50) %>% bricks_from_mosaic() %>% build_bricks() 
+#   display_set() %>%
+#   display_3d(fov=0, theta=-20, phi=30, windowsize=c(1000,800), zoom=0.7)
+# 
+ ```
+

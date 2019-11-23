@@ -17,7 +17,7 @@ editor_options:
 ---
 
 # Import libraries and data
-```{r, message=T}
+```{r, message=T, warning=F}
 rm(list=ls())
 
 proj <- "cran"
@@ -108,7 +108,7 @@ p <- summary %>%
          
 #api_create(p2, filename="CRAN")
 
-saveWidget(p, paste0(here(),"/docs/cran_scatter.html"), selfcontained = T, libdir = "lib")
+saveWidget(p, paste0(here(),"/docs/cran_scatter.html"), selfcontained = F, libdir = "lib")
 
 p
 ```
